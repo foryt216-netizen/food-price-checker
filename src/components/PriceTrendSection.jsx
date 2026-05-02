@@ -7,7 +7,8 @@ export default function PriceTrendSection({ prices, loading }) {
     const entry = prices[item.code]
     if (!entry?.price || !entry?.prevPrice) return null
     const pct = ((entry.price - entry.prevPrice) / entry.prevPrice) * 100
-    return { ...item, price: entry.price, prevPrice: entry.prevPrice, pct }
+    const diff = Math.round(entry.price - entry.prevPrice)
+    return { ...item, price: entry.price, prevPrice: entry.prevPrice, pct, diff }
   }).filter(Boolean)
 
   if (items.length === 0) return null
@@ -38,7 +39,7 @@ export default function PriceTrendSection({ prices, loading }) {
                   <span className="trend-emoji">{item.emoji}</span>
                   <span className="trend-name">{item.name}</span>
                   <span className="trend-price">{item.price.toLocaleString()}円/{item.unit}</span>
-                  <span className="trend-pct spike">+{item.pct.toFixed(1)}%</span>
+                  <span className="trend-pct spike">+{item.pct.toFixed(1)}% (+{item.diff.toLocaleString()}円)</span>
                 </li>
               ))}
             </ul>
@@ -53,7 +54,7 @@ export default function PriceTrendSection({ prices, loading }) {
                   <span className="trend-emoji">{item.emoji}</span>
                   <span className="trend-name">{item.name}</span>
                   <span className="trend-price">{item.price.toLocaleString()}円/{item.unit}</span>
-                  <span className="trend-pct drop">{item.pct.toFixed(1)}%</span>
+                  <span className="trend-pct drop">{item.pct.toFixed(1)}% ({item.diff.toLocaleString()}円)</span>
                 </li>
               ))}
             </ul>
