@@ -1,15 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  STATS_ID, getMetaInfo, getStatsData,
-  lastNMonthCodes, formatMonthLabel,
+  STATS_ID, QUICK_ITEMS, ITEM_UNITS,
+  getMetaInfo, getStatsData,
+  lastNMonthCodes, formatMonthLabel, cleanItemName,
+  calcNationalAvg, groupByTime,
 } from './services/estatApi'
 import SearchBar from './components/SearchBar'
 import RegionSelect from './components/RegionSelect'
 import PriceDisplay from './components/PriceDisplay'
 import PriceChart from './components/PriceChart'
 import AlertPanel from './components/AlertPanel'
+import QuickPriceList from './components/QuickPriceList'
 
-// 小売物価統計調査 調査対象都市 81市（APIの実データから取得）
+// 小売物価統計調査 調査対象都市 81市
 const ALL_AREAS = [
   { code: 'NATIONAL', name: '全国平均（全都市の平均）' },
   { code: '01100', name: '札幌市' },
@@ -95,18 +98,15 @@ const ALL_AREAS = [
   { code: '47201', name: '那覇市' },
 ]
 
-function avg(arr) {
-  const valid = arr.filter(v => v != null && !isNaN(v))
-  return valid.length > 0 ? Math.round(valid.reduce((a, b) => a + b, 0) / valid.length) : null
-}
-
 export default function App() {
   const [allItems, setAllItems] = useState([])
   const [selectedItem, setSelectedItem] = useState(null)
   const [selectedArea, setSelectedArea] = useState('NATIONAL')
   const [priceHistory, setPriceHistory] = useState([])
   const [userPrice, setUserPrice] = useState('')
+  const [quickPrices, setQuickPrices] = useState({})
   const [initLoading, setInitLoading] = useState(true)
+  const [quickLoading, setQuickLoading] = useState(false)
   const [loadingPrices, setLoadingPrices] = useState(false)
   const [initError, setInitError] = useState(null)
   const [priceError, setPriceError] = useState(null)
@@ -126,46 +126,75 @@ export default function App() {
       if (!classObjs) throw new Error('メタデータが取得できませんでした')
 
       const objArr = Array.isArray(classObjs) ? classObjs : [classObjs]
-      let found = false
       for (const obj of objArr) {
-        const id = obj['@id'] || ''
-        const name = obj['@name'] || ''
-        // cat02 = 銘柄（品目コード）
-        if (id === 'cat02' || name.includes('銘柄')) {
+        if (obj['@id'] === 'cat02' || (obj['@name'] || '').includes('銘柄')) {
           const classes = Array.isArray(obj.CLASS) ? obj.CLASS : obj.CLASS ? [obj.CLASS] : []
           const items = classes
-            .map(c => ({ code: c['@code'], name: c['@name'] }))
+            .map(c => ({ code: c['@code'], name: cleanItemName(c['@name']) }))
             .filter(c => c.code && c.name)
-          if (items.length > 0) {
-            setAllItems(items)
-            found = true
-          }
+          if (items.length > 0) setAllItems(items)
         }
       }
-      if (!found) throw new Error('品目データが見つかりませんでした')
     } catch (e) {
       console.error(e)
       setInitError(`初期化エラー: ${e.message}`)
     }
     setInitLoading(false)
+    loadQuickPrices()
+  }
+
+  const loadQuickPrices = async () => {
+    setQuickLoading(true)
+    try {
+      const months = lastNMonthCodes(3)
+      const fromCode = months[0]
+      const toCode = months[months.length - 1]
+
+      // 8品目を並列取得
+      const results = await Promise.all(
+        QUICK_ITEMS.map(item =>
+          getStatsData(STATS_ID, {
+            cdCat01: '0020',
+            cdCat02: item.code,
+            cdTimeFrom: fromCode,
+            cdTimeTo: toCode,
+          }).catch(() => null)
+        )
+      )
+
+      const prices = {}
+      let latestMonth = ''
+
+      results.forEach((raw, i) => {
+        const byTime = groupByTime(raw)
+        const sortedTimes = Object.keys(byTime).sort().reverse()
+        if (sortedTimes.length === 0) return
+        const latest = sortedTimes[0]
+        const nationalAvg = calcNationalAvg(byTime[latest])
+        if (nationalAvg != null) {
+          prices[QUICK_ITEMS[i].code] = { price: nationalAvg, month: formatMonthLabel(latest) }
+          if (latest > latestMonth) latestMonth = latest
+        }
+      })
+
+      setQuickPrices({ ...prices, month: latestMonth ? formatMonthLabel(latestMonth) : '' })
+    } catch (e) {
+      console.error('クイック価格取得エラー:', e)
+    }
+    setQuickLoading(false)
   }
 
   const loadPriceData = useCallback(async () => {
     if (!selectedItem) return
     setLoadingPrices(true)
     setPriceError(null)
-
     try {
       const months = lastNMonthCodes(6)
-      const fromCode = months[0]
-      const toCode = months[months.length - 1]
-
-      // 全都市・全期間を一度に取得し、クライアント側で全国平均を計算
       const raw = await getStatsData(STATS_ID, {
-        cdCat01: '0020',   // データの種別：価格
+        cdCat01: '0020',
         cdCat02: selectedItem.code,
-        cdTimeFrom: fromCode,
-        cdTimeTo: toCode,
+        cdTimeFrom: months[0],
+        cdTimeTo: months[months.length - 1],
       })
 
       const vals = raw?.GET_STATS_DATA?.STATISTICAL_DATA?.DATA_INF?.VALUE
@@ -176,8 +205,6 @@ export default function App() {
       }
 
       const arr = Array.isArray(vals) ? vals : [vals]
-
-      // 時間コード別・都市別に整理
       const byTime = {}
       for (const v of arr) {
         const t = String(v['@time'] || '')
@@ -192,17 +219,10 @@ export default function App() {
 
       const history = months.map(code => {
         const entry = byTime[code]
-        const national = entry ? avg(entry.all) : null
+        const national = entry ? calcNationalAvg(entry.all) : null
         const regional =
-          entry && selectedArea !== 'NATIONAL'
-            ? (entry.cityMap[selectedArea] ?? null)
-            : null
-        return {
-          timeCode: code,
-          month: formatMonthLabel(code),
-          national,
-          regional,
-        }
+          entry && selectedArea !== 'NATIONAL' ? (entry.cityMap[selectedArea] ?? null) : null
+        return { timeCode: code, month: formatMonthLabel(code), national, regional }
       })
 
       setPriceHistory(history)
@@ -214,11 +234,20 @@ export default function App() {
     setLoadingPrices(false)
   }, [selectedItem, selectedArea])
 
+  // クイックリストからアイテムを選択したとき（コードだけ持つためallItemsから探す）
+  const handleQuickSelect = (quickItem) => {
+    const found = allItems.find(i => i.code === quickItem.code)
+    setSelectedItem(found ?? { code: quickItem.code, name: quickItem.name })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const validHistory = priceHistory.filter(h => h.national !== null)
   const latest = validHistory[validHistory.length - 1]
   const previous = validHistory[validHistory.length - 2]
   const latestNational = latest?.national ?? null
   const latestRegional = selectedArea !== 'NATIONAL' ? (latest?.regional ?? null) : null
+
+  const itemUnit = selectedItem ? (ITEM_UNITS[selectedItem.code] || '') : ''
 
   const getPriceColor = () => {
     if (!userPrice || !latestNational) return null
@@ -270,6 +299,16 @@ export default function App() {
               />
             </div>
 
+            {/* 検索前: よく使う食品一覧 */}
+            {!selectedItem && (
+              <QuickPriceList
+                prices={quickPrices}
+                loading={quickLoading}
+                onSelect={handleQuickSelect}
+              />
+            )}
+
+            {/* 検索後: 詳細表示 */}
             {selectedItem && (
               <>
                 <div className="card">
@@ -298,6 +337,7 @@ export default function App() {
                     <div className="card">
                       <PriceDisplay
                         itemName={selectedItem.name}
+                        unit={itemUnit}
                         nationalPrice={latestNational}
                         regionalPrice={latestRegional}
                         areaName={selectedAreaName}
@@ -326,7 +366,7 @@ export default function App() {
       </main>
 
       <footer className="app-footer">
-        <p>データ出典: 総務省統計局 小売物価統計調査（e-Stat API）statsDataId: {STATS_ID}</p>
+        <p>データ出典: 総務省統計局 小売物価統計調査（e-Stat API）</p>
       </footer>
     </div>
   )
