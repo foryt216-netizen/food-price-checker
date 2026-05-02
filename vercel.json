@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/estat/:path*",
+      "destination": "https://api.e-stat.go.jp/:path*"
+    }
+  ]
+}
