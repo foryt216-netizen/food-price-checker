@@ -11,6 +11,7 @@ import PriceDisplay from './components/PriceDisplay'
 import PriceChart from './components/PriceChart'
 import AlertPanel from './components/AlertPanel'
 import QuickPriceList from './components/QuickPriceList'
+import PriceTrendSection from './components/PriceTrendSection'
 
 // 小売物価統計調査 調査対象都市 81市
 const ALL_AREAS = [
@@ -170,9 +171,15 @@ export default function App() {
         const sortedTimes = Object.keys(byTime).sort().reverse()
         if (sortedTimes.length === 0) return
         const latest = sortedTimes[0]
+        const prev = sortedTimes[1]
         const nationalAvg = calcNationalAvg(byTime[latest])
+        const prevNationalAvg = prev ? calcNationalAvg(byTime[prev]) : null
         if (nationalAvg != null) {
-          prices[QUICK_ITEMS[i].code] = { price: nationalAvg, month: formatMonthLabel(latest) }
+          prices[QUICK_ITEMS[i].code] = {
+            price: nationalAvg,
+            month: formatMonthLabel(latest),
+            prevPrice: prevNationalAvg,
+          }
           if (latest > latestMonth) latestMonth = latest
         }
       })
@@ -299,13 +306,19 @@ export default function App() {
               />
             </div>
 
-            {/* 検索前: よく使う食品一覧 */}
+            {/* 検索前: よく使う食品一覧 + 価格動向 */}
             {!selectedItem && (
-              <QuickPriceList
-                prices={quickPrices}
-                loading={quickLoading}
-                onSelect={handleQuickSelect}
-              />
+              <>
+                <QuickPriceList
+                  prices={quickPrices}
+                  loading={quickLoading}
+                  onSelect={handleQuickSelect}
+                />
+                <PriceTrendSection
+                  prices={quickPrices}
+                  loading={quickLoading}
+                />
+              </>
             )}
 
             {/* 検索後: 詳細表示 */}

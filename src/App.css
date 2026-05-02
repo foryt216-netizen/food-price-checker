@@ -310,6 +310,84 @@ body {
   text-align: center;
 }
 
+/* Gram calculator */
+.gram-calc-section {
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1rem;
+  margin-bottom: .75rem;
+}
+.gram-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+.gram-input {
+  width: 120px;
+  padding: .6rem .75rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  font-family: inherit;
+}
+.gram-input:focus { border-color: #2563eb; }
+.gram-results { display: flex; flex-wrap: wrap; gap: .5rem; }
+.gram-result-item {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: .5rem .9rem;
+}
+.gram-result-label { font-size: .72rem; color: #64748b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.gram-result-item strong { font-size: .95rem; color: #1e293b; }
+.gram-diff { font-size: .78rem; }
+.gram-diff.up { color: #dc2626; }
+.gram-diff.down { color: #16a34a; }
+
+/* Price trend section */
+.trend-card { }
+.trend-header {
+  display: flex;
+  align-items: baseline;
+  gap: .75rem;
+  margin-bottom: .75rem;
+}
+.trend-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.trend-title {
+  font-size: .9rem;
+  font-weight: 700;
+  margin-bottom: .5rem;
+}
+.trend-title.spike { color: #dc2626; }
+.trend-title.drop { color: #16a34a; }
+.trend-list { list-style: none; display: flex; flex-direction: column; gap: .35rem; }
+.trend-item {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem .65rem;
+  border-radius: 8px;
+}
+.trend-item.spike { background: #fff1f2; }
+.trend-item.drop { background: #f0fdf4; }
+.trend-emoji { font-size: 1.15rem; line-height: 1; flex-shrink: 0; }
+.trend-name { flex: 1; font-size: .82rem; font-weight: 600; color: #1e293b; }
+.trend-price { font-size: .75rem; color: #64748b; white-space: nowrap; }
+.trend-pct { font-size: .85rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.trend-pct.spike { color: #dc2626; }
+.trend-pct.drop { color: #16a34a; }
+@media (max-width: 520px) {
+  .trend-sections { grid-template-columns: 1fr; }
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
 @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; } }

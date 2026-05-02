@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react'
+
 const COLOR_LABELS = {
   green: { bg: '#dcfce7', border: '#16a34a', text: '#15803d', label: '安い', icon: '↓' },
   yellow: { bg: '#fef9c3', border: '#ca8a04', text: '#92400e', label: '平均的', icon: '→' },
@@ -18,9 +20,26 @@ export default function PriceDisplay({
   itemName, unit, nationalPrice, regionalPrice, areaName,
   userPrice, onUserPriceChange, priceColor, latestMonth,
 }) {
+  const [gramAmount, setGramAmount] = useState('')
+
+  // detect gram-based unit like "100g"
+  const gramMatch = unit ? unit.match(/^(\d+)g$/) : null
+  const gramBase = gramMatch ? parseInt(gramMatch[1]) : null
+
+  // reset gram input when item changes
+  useEffect(() => { setGramAmount('') }, [itemName])
+
   const colorInfo = priceColor ? COLOR_LABELS[priceColor] : null
   const diffPct = userPrice && nationalPrice
     ? (((parseFloat(userPrice) - nationalPrice) / nationalPrice) * 100).toFixed(1)
+    : null
+
+  const parsedGram = gramAmount ? parseFloat(gramAmount) : null
+  const gramNationalTotal = parsedGram && nationalPrice && gramBase
+    ? Math.round((parsedGram / gramBase) * nationalPrice)
+    : null
+  const gramUserTotal = parsedGram && userPrice && !isNaN(parseFloat(userPrice)) && gramBase
+    ? Math.round((parsedGram / gramBase) * parseFloat(userPrice))
     : null
 
   return (
@@ -49,6 +68,45 @@ export default function PriceDisplay({
           </div>
         )}
       </div>
+
+      {/* Gram calculator — only for items with g-based units */}
+      {gramBase && nationalPrice != null && (
+        <div className="gram-calc-section">
+          <label className="section-label" htmlFor="gram-input">
+            グラム数で合計金額を計算
+          </label>
+          <div className="gram-input-wrap">
+            <input
+              id="gram-input"
+              type="number"
+              className="gram-input"
+              placeholder={`例: 250`}
+              value={gramAmount}
+              onChange={e => setGramAmount(e.target.value)}
+              min="1"
+            />
+            <span className="price-unit-label">g</span>
+          </div>
+          {gramNationalTotal != null && (
+            <div className="gram-results">
+              <div className="gram-result-item">
+                <span className="gram-result-label">全国平均</span>
+                <strong>{parseFloat(gramAmount).toLocaleString()}g ≈ {gramNationalTotal.toLocaleString()}円</strong>
+              </div>
+              {gramUserTotal != null && (
+                <div className="gram-result-item">
+                  <span className="gram-result-label">あなたの価格</span>
+                  <strong>{parseFloat(gramAmount).toLocaleString()}g ≈ {gramUserTotal.toLocaleString()}円</strong>
+                  <span className={`gram-diff ${gramUserTotal > gramNationalTotal ? 'up' : 'down'}`}>
+                    全国平均より{gramUserTotal > gramNationalTotal ? '+' : ''}
+                    {(gramUserTotal - gramNationalTotal).toLocaleString()}円
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="user-price-section">
         <label className="section-label" htmlFor="user-price">
