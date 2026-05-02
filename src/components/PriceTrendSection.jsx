@@ -19,12 +19,14 @@ export default function PriceTrendSection({ prices, loading }) {
   if (spikes.length === 0 && drops.length === 0) return null
 
   const month = prices.month || ''
+  const prevMonth = prices.prevMonth || ''
+  const periodLabel = prevMonth && month ? `${prevMonth} → ${month}` : month
 
   return (
     <div className="card trend-card">
       <div className="trend-header">
         <span className="section-label">先月比 価格動向</span>
-        {month && <span className="quick-subtitle">{month}</span>}
+        {periodLabel && <span className="quick-subtitle">{periodLabel}</span>}
       </div>
       <div className="trend-sections">
         {spikes.length > 0 && (

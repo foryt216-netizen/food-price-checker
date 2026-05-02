@@ -147,7 +147,9 @@ export default function App() {
   const loadQuickPrices = async () => {
     setQuickLoading(true)
     try {
-      const months = lastNMonthCodes(3)
+      // 6ヶ月分取得: e-Statの公表ラグ(約2ヶ月)があるため3ヶ月だと直近1ヶ月しか
+      // データがなく前月比が計算できない。6ヶ月なら必ず2ヶ月以上の実績値が入る。
+      const months = lastNMonthCodes(6)
       const fromCode = months[0]
       const toCode = months[months.length - 1]
 
@@ -165,6 +167,7 @@ export default function App() {
 
       const prices = {}
       let latestMonth = ''
+      let prevMonth = ''
 
       results.forEach((raw, i) => {
         const byTime = groupByTime(raw)
@@ -180,11 +183,18 @@ export default function App() {
             month: formatMonthLabel(latest),
             prevPrice: prevNationalAvg,
           }
-          if (latest > latestMonth) latestMonth = latest
+          if (latest > latestMonth) {
+            latestMonth = latest
+            prevMonth = prev || ''
+          }
         }
       })
 
-      setQuickPrices({ ...prices, month: latestMonth ? formatMonthLabel(latestMonth) : '' })
+      setQuickPrices({
+        ...prices,
+        month: latestMonth ? formatMonthLabel(latestMonth) : '',
+        prevMonth: prevMonth ? formatMonthLabel(prevMonth) : '',
+      })
     } catch (e) {
       console.error('クイック価格取得エラー:', e)
     }
