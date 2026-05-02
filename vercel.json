@@ -1,8 +1,8 @@
 {
-  "rewrites": [
-    {
-      "source": "/api/estat/:path*",
-      "destination": "https://api.e-stat.go.jp/:path*"
+  "functions": {
+    "api/estat/[...path].js": {
+      "memory": 128,
+      "maxDuration": 15
     }
-  ]
+  }
 }
