@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  STATS_ID, QUICK_ITEMS, CATEGORIES, getItemCategory,
+  STATS_ID, QUICK_ITEMS, CATEGORIES, EXCLUDED_CODES, getItemCategory,
   getMetaInfo, getStatsData, getItemUnit,
   lastNMonthCodes, formatMonthLabel, cleanItemName,
   calcNationalAvg, groupByTime,
@@ -384,7 +384,7 @@ export default function App() {
           <>
             <div className="card">
               <SearchBar
-                items={allItems}
+                items={allItems.filter(i => !EXCLUDED_CODES.has(i.code))}
                 selectedItem={selectedItem}
                 onSelect={setSelectedItem}
               />
