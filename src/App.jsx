@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  STATS_ID, QUICK_ITEMS,
+  STATS_ID, QUICK_ITEMS, CATEGORIES, getItemCategory,
   getMetaInfo, getStatsData, getItemUnit,
   lastNMonthCodes, formatMonthLabel, cleanItemName,
   calcNationalAvg, groupByTime,
@@ -12,6 +12,7 @@ import PriceChart from './components/PriceChart'
 import AlertPanel from './components/AlertPanel'
 import QuickPriceList from './components/QuickPriceList'
 import PriceTrendSection from './components/PriceTrendSection'
+import CategoryCompare from './components/CategoryCompare'
 
 // 小売物価統計調査 調査対象都市 81市
 const ALL_AREAS = [
@@ -111,12 +112,31 @@ export default function App() {
   const [loadingPrices, setLoadingPrices] = useState(false)
   const [initError, setInitError] = useState(null)
   const [priceError, setPriceError] = useState(null)
+  const [activeCategory, setActiveCategory] = useState('all')
+  const [catPrices, setCatPrices] = useState({})
+  // Ref to track categories that have been fetched or are fetching (prevents duplicate API calls)
+  const loadingCatsRef = useRef(new Set())
 
   useEffect(() => { initApp() }, [])
 
   useEffect(() => {
     if (selectedItem) loadPriceData()
   }, [selectedItem, selectedArea])
+
+  // Load category prices when tab changes (also re-tries if allItems wasn't ready yet)
+  useEffect(() => {
+    if (activeCategory !== 'all' && allItems.length > 0) {
+      loadCatPrices(activeCategory)
+    }
+  }, [activeCategory, allItems.length])
+
+  // Pre-load same-category prices when an item is selected (for comparison panel)
+  useEffect(() => {
+    if (selectedItem && allItems.length > 0) {
+      const cat = getItemCategory(selectedItem.code)
+      if (cat) loadCatPrices(cat.id)
+    }
+  }, [selectedItem?.code, allItems.length])
 
   const initApp = async () => {
     setInitLoading(true)
@@ -153,7 +173,6 @@ export default function App() {
       const fromCode = months[0]
       const toCode = months[months.length - 1]
 
-      // 8品目を並列取得
       const results = await Promise.all(
         QUICK_ITEMS.map(item =>
           getStatsData(STATS_ID, {
@@ -199,6 +218,56 @@ export default function App() {
       console.error('クイック価格取得エラー:', e)
     }
     setQuickLoading(false)
+  }
+
+  const loadCatPrices = async (catId) => {
+    if (catId === 'all' || loadingCatsRef.current.has(catId)) return
+    if (!allItems.length) return
+    const catDef = CATEGORIES.find(c => c.id === catId)
+    if (!catDef?.codes) return
+
+    loadingCatsRef.current.add(catId)
+
+    const items = allItems.filter(i => catDef.codes.includes(i.code)).slice(0, 12)
+    if (!items.length) {
+      setCatPrices(prev => ({ ...prev, [catId]: { items: [], loading: false, loaded: true } }))
+      return
+    }
+
+    setCatPrices(prev => ({ ...prev, [catId]: { items: [], loading: true, loaded: false } }))
+
+    const months = lastNMonthCodes(6)
+    const results = await Promise.all(
+      items.map(item =>
+        getStatsData(STATS_ID, {
+          cdCat01: '0020',
+          cdCat02: item.code,
+          cdTimeFrom: months[0],
+          cdTimeTo: months[months.length - 1],
+        }).catch(() => null)
+      )
+    )
+
+    const loaded = []
+    results.forEach((raw, idx) => {
+      const byTime = groupByTime(raw)
+      const sortedTimes = Object.keys(byTime).sort().reverse()
+      if (!sortedTimes.length) return
+      const price = calcNationalAvg(byTime[sortedTimes[0]])
+      const prevPrice = sortedTimes[1] ? calcNationalAvg(byTime[sortedTimes[1]]) : null
+      if (price != null) {
+        loaded.push({
+          code: items[idx].code,
+          name: items[idx].name,
+          unit: getItemUnit(items[idx].code, items[idx].name),
+          price,
+          prevPrice,
+          month: formatMonthLabel(sortedTimes[0]),
+        })
+      }
+    })
+
+    setCatPrices(prev => ({ ...prev, [catId]: { items: loaded, loading: false, loaded: true } }))
   }
 
   const loadPriceData = useCallback(async () => {
@@ -251,10 +320,14 @@ export default function App() {
     setLoadingPrices(false)
   }, [selectedItem, selectedArea])
 
-  // クイックリストからアイテムを選択したとき（コードだけ持つためallItemsから探す）
-  const handleQuickSelect = (quickItem) => {
-    const found = allItems.find(i => i.code === quickItem.code)
-    setSelectedItem(found ?? { code: quickItem.code, name: quickItem.name })
+  const handleQuickSelect = (item) => {
+    const found = allItems.find(i => i.code === item.code)
+    setSelectedItem(found ?? { code: item.code, name: item.name })
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleBackToTop = () => {
+    setSelectedItem(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -265,6 +338,7 @@ export default function App() {
   const latestRegional = selectedArea !== 'NATIONAL' ? (latest?.regional ?? null) : null
 
   const itemUnit = selectedItem ? getItemUnit(selectedItem.code, selectedItem.name) : ''
+  const selectedCat = selectedItem ? getItemCategory(selectedItem.code) : null
 
   const getPriceColor = () => {
     if (!userPrice || !latestNational) return null
@@ -316,13 +390,16 @@ export default function App() {
               />
             </div>
 
-            {/* 検索前: よく使う食品一覧 + 価格動向 */}
+            {/* トップページ: カテゴリータブ + 価格動向 */}
             {!selectedItem && (
               <>
                 <QuickPriceList
                   prices={quickPrices}
                   loading={quickLoading}
                   onSelect={handleQuickSelect}
+                  activeCategory={activeCategory}
+                  onCategoryChange={setActiveCategory}
+                  catData={catPrices[activeCategory]}
                 />
                 <PriceTrendSection
                   prices={quickPrices}
@@ -331,9 +408,13 @@ export default function App() {
               </>
             )}
 
-            {/* 検索後: 詳細表示 */}
+            {/* 詳細画面 */}
             {selectedItem && (
               <>
+                <button className="btn-back" onClick={handleBackToTop}>
+                  ← トップに戻る
+                </button>
+
                 <div className="card">
                   <RegionSelect
                     areas={ALL_AREAS}
@@ -379,6 +460,16 @@ export default function App() {
                           showRegional={selectedArea !== 'NATIONAL'}
                         />
                       </div>
+                    )}
+
+                    {/* 同カテゴリーの食品比較 */}
+                    {selectedCat && (
+                      <CategoryCompare
+                        category={selectedCat}
+                        catData={catPrices[selectedCat.id]}
+                        selectedCode={selectedItem.code}
+                        onSelect={handleQuickSelect}
+                      />
                     )}
                   </>
                 )}
