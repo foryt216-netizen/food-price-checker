@@ -58,8 +58,8 @@ export function cleanItemName(name) {
 export const ITEM_UNITS = {
   // 精白米 (5kg)
   '01001': '5kg', '01002': '5kg', '01003': '5kg', '01004': '5kg', '01005': '5kg',
-  // パン
-  '01021': '1kg',
+  // パン（食パン1斤 = 約340g、総務省調査単位）
+  '01021': '1斤',
   // めん類
   '01031': '200g', '01032': '200g',
   '01041': '1袋', '01042': '1袋',
@@ -147,7 +147,7 @@ export function getItemUnit(code, itemName = '') {
 
 // トップページに表示するよく使う食品（APIで確認済みコード）
 export const QUICK_ITEMS = [
-  { code: '01021', name: '食パン',        unit: '1kg',    emoji: '🍞' },
+  { code: '01021', name: '食パン',        unit: '1斤',    emoji: '🍞' },
   { code: '01341', name: '鶏卵',          unit: '10個',   emoji: '🥚' },
   { code: '01303', name: '牛乳',          unit: '1000ml', emoji: '🥛' },
   { code: '01407', name: 'もやし',        unit: '1kg',    emoji: '🌱' },

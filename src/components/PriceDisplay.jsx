@@ -22,10 +22,13 @@ export default function PriceDisplay({
 }) {
   const [amount, setAmount] = useState('')
 
-  // g または ml 単位の品目を検出: "100g", "1000ml" など
-  const unitMatch = unit ? unit.match(/^(\d+)(g|ml)$/) : null
-  const unitBase = unitMatch ? parseInt(unitMatch[1]) : null
-  const unitType = unitMatch ? unitMatch[2] : null
+  // g / ml / kg 単位の品目を検出。kg 品目はユーザーがグラムで入力できるよう
+  // 内部ベースを1000倍に変換し、入力単位を 'g' として扱う。
+  const unitMatch = unit ? unit.match(/^(\d+)(g|ml|kg)$/) : null
+  const rawUnitNum = unitMatch ? parseInt(unitMatch[1]) : null
+  const rawUnitType = unitMatch ? unitMatch[2] : null
+  const unitBase = rawUnitType === 'kg' ? rawUnitNum * 1000 : rawUnitNum
+  const unitType = rawUnitType === 'kg' ? 'g' : rawUnitType
 
   // 品目が変わったら入力をリセット
   useEffect(() => { setAmount('') }, [itemName])
@@ -81,7 +84,7 @@ export default function PriceDisplay({
               id="unit-input"
               type="number"
               className="gram-input"
-              placeholder={unitType === 'ml' ? '例: 200' : '例: 250'}
+              placeholder={unitType === 'ml' ? '例: 200' : rawUnitType === 'kg' ? '例: 200（g）' : '例: 250'}
               value={amount}
               onChange={e => setAmount(e.target.value)}
               min="1"
