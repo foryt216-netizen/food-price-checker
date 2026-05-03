@@ -1,12 +1,22 @@
 import { useState, useRef, useEffect } from 'react'
 
+// カタカナ→ひらがな変換（U+30A1–U+30F6 の範囲のみ）
+function toHiragana(str) {
+  return str.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
+}
+
+function normalize(str) {
+  return toHiragana(str).toLowerCase()
+}
+
 export default function SearchBar({ items, selectedItem, onSelect }) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
-  const filtered = query.trim()
-    ? items.filter(i => i.name.includes(query.trim())).slice(0, 15)
+  const q = normalize(query.trim())
+  const filtered = q
+    ? items.filter(i => normalize(i.name).includes(q)).slice(0, 15)
     : []
 
   useEffect(() => {

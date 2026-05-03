@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
-  STATS_ID, QUICK_ITEMS, ITEM_UNITS,
-  getMetaInfo, getStatsData,
+  STATS_ID, QUICK_ITEMS,
+  getMetaInfo, getStatsData, getItemUnit,
   lastNMonthCodes, formatMonthLabel, cleanItemName,
   calcNationalAvg, groupByTime,
 } from './services/estatApi'
@@ -264,7 +264,7 @@ export default function App() {
   const latestNational = latest?.national ?? null
   const latestRegional = selectedArea !== 'NATIONAL' ? (latest?.regional ?? null) : null
 
-  const itemUnit = selectedItem ? (ITEM_UNITS[selectedItem.code] || '') : ''
+  const itemUnit = selectedItem ? getItemUnit(selectedItem.code, selectedItem.name) : ''
 
   const getPriceColor = () => {
     if (!userPrice || !latestNational) return null
